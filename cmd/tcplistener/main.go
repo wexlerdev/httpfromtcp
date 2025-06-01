@@ -51,12 +51,13 @@ func getLinesChannel(f io.ReadCloser) <- chan string {
 func main() {
 
 	listener, err := net.Listen("tcp", ":42069")
-	defer listener.Close()
 
 	if err != nil {
 		fmt.Printf("ERR: %v\n", err)
 		return
 	}
+	defer listener.Close()
+	
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
