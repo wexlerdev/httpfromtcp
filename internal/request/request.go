@@ -8,6 +8,7 @@ import (
 )
 type Request struct {
 	RequestLine RequestLine
+	ParserState int
 }
 
 type RequestLine struct {
@@ -16,69 +17,146 @@ type RequestLine struct {
 	Method        string
 }
 
+const (
+	ParserStateInitialized int = iota // 0
+	ParserStateDone                   // 1
+)
+
+const bufSize = 8
+
 func RequestFromReader(reader io.Reader) (*Request, error) {
-	bites, err := io.ReadAll(reader)
-	if err != nil {
-		return nil, err
-	}
-	requestLine, err := parseRequestLine(bites)
-	if err != nil {
-		return nil, err
-	}
 
 	var requestStruct Request
+	requestStruct.ParserState = ParserStateInitialized
 
-	requestStruct.RequestLine = *requestLine
+	buf := make([]byte, bufSize)
+	bytesParsed := 0
+	readToIndex := 0
+
+	//doesn't handle EOF right now
+	for requestStruct.ParserState != ParserStateDone {
+		n, err := reader.Read(buf[readToIndex:])
+		if err != nil {
+			if err == io.EOF {
+				requestStruct.ParserState = ParserStateDone
+				break
+			}
+
+			return nil, err
+		}
+		readToIndex += n
+
+		n, err = requestStruct.parse(buf)
+		if err != nil {
+			return nil, err
+		}
+		if n == 0 {
+			newLen := 2 * cap(buf)
+
+			tempBuf := make([]byte, newLen)
+			copy(tempBuf, buf)
+			buf = tempBuf
+		} else {
+			//remove parsed text from buffer
+			newLen := cap(buf) - n
+			if newLen < bufSize {
+				newLen = bufSize
+			}
+			copy(buf, buf[n:])
+			buf = buf[:newLen]
+			readToIndex -= n
+		}
+		bytesParsed += n
+
+	}
 
 	return &requestStruct, nil
 	
 }
 
-func parseRequestLine(bites []byte) (*RequestLine, error) {
+func (r * Request) parse(data []byte) (int, error) {
+	if r.ParserState == ParserStateDone {
+		return 0, errors.New("can't parse in a done state")
+	}
+
+	if r.ParserState != ParserStateInitialized {
+		return 0, errors.New("can't parse in an unknown state")
+	}
+
+	requestLineStruct, n, err := parseRequestLine(data)
+	if err != nil {
+		return 0, err
+	}
+	if n == 0 {
+		return 0, nil
+	}
+
+	//tis was a success, set the requestLine
+	r.RequestLine = * requestLineStruct
+
+	//set state to done
+	r.ParserState = ParserStateDone
+
+	return n, nil
+
+}
+
+func parseRequestLine(bites []byte) (*RequestLine, int, error) {
 	bigOlString := string(bites)
 	sliceOStrings := strings.Split(bigOlString, "\r\n")
+
+	if len(sliceOStrings) < 2 {
+		return nil, 0, nil
+	}  
 
 	//now we have each line seperate, the request line is at index 0
 	requestLine := sliceOStrings[0]
 
 	var requestLineStruct RequestLine
+	n, err := parseRequestLineFromString(requestLine, &requestLineStruct)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return  &requestLineStruct, n, nil
+}
+
+func parseRequestLineFromString(str string, requestLineStruct *RequestLine) (int, error) {
 	
-	sliceOStrings = strings.Split(requestLine, " ")
+	sliceOStrings := strings.Split(str, " ")
 	if len(sliceOStrings) > 3 {
-		return nil, errors.New("Too many parts in the request line, this is wack")
+		return 0, errors.New("Too many parts in the request line, this is wack")
 	}
 
 	//method (not method man)
 	method := sliceOStrings[0]
 	if method != strings.ToUpper(method) {
-		return nil, errors.New("method is not all uppercase, this is supa wack")
+		return 0, errors.New("method is not all uppercase, this is supa wack")
 	}
-
-	requestLineStruct.Method = method
 
 	//path (feel my wrath on this path)
 	path := sliceOStrings[1]
 	if path[0] != '/' {
-		return nil, errors.New("no leading / in path, I am disapointed in you")
+		return 0, errors.New("no leading / in path, I am disapointed in you")
 	}
-
-	requestLineStruct.RequestTarget = path
 
 	//http version (I have an aversion to the version, I am certain)
 	version := sliceOStrings[2]
 	if version != "HTTP/1.1" {
-		return nil, errors.New("homie we don't support that version")
+		return 0, errors.New("homie we don't support that version")
 	}
 
 	n, err := fmt.Sscanf(version, "HTTP/%s", &version)
 	if err != nil {
-		return nil, errors.New("whats with the formatting on the version?")
+		return 0, errors.New("whats with the formatting on the version?")
 	}
 	if n != 1 {
-		return nil, errors.New("Something is up with the formatting")
+		return 0, errors.New("Something is up with the formatting")
 	}
 	
+	requestLineStruct.Method = method
 	requestLineStruct.HttpVersion = version
+	requestLineStruct.RequestTarget = path
 
-	return &requestLineStruct, nil
+	return n, nil
 }
