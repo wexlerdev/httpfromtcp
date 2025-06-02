@@ -32,7 +32,7 @@ func getLinesChannel(f io.ReadCloser) <- chan string {
 			}
 
 			str := string(buffah[:nBytesRead])
-			parts := strings.Split(str, "\n")
+			parts := strings.Split(str, "\r\n")
 			numParts := len(parts)
 
 			for i := 0; i < numParts -1; i++ {
@@ -50,7 +50,7 @@ func getLinesChannel(f io.ReadCloser) <- chan string {
 
 func main() {
 
-	listener, err := net.Listen("tcp", ":42069")
+	listener, err := net.Listen("tcp", "localhost:42069")
 
 	if err != nil {
 		fmt.Printf("ERR: %v\n", err)
@@ -70,7 +70,7 @@ func main() {
 
 		channel := getLinesChannel(conn)
 		for line := range channel {
-			fmt.Printf("%s", line)
+			fmt.Printf("%s\n", line)
 		}
 		fmt.Print("\n")
 		fmt.Println("Connection has been closed")
