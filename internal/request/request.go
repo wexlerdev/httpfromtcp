@@ -30,12 +30,11 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 	requestStruct.ParserState = ParserStateInitialized
 
 	buf := make([]byte, bufSize)
-	bytesParsed := 0
 	readToIndex := 0
 
 	//doesn't handle EOF right now
 	for requestStruct.ParserState != ParserStateDone {
-		n, err := reader.Read(buf[readToIndex:])
+		bytesRead, err := reader.Read(buf[readToIndex:])
 		if err != nil {
 			if err == io.EOF {
 				requestStruct.ParserState = ParserStateDone
@@ -44,13 +43,13 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 
 			return nil, err
 		}
-		readToIndex += n
+		readToIndex += bytesRead
 
-		n, err = requestStruct.parse(buf)
+		bytesParsed, err := requestStruct.parse(buf)
 		if err != nil {
 			return nil, err
 		}
-		if n == 0 {
+		if bytesParsed == 0 {
 			newLen := 2 * cap(buf)
 
 			tempBuf := make([]byte, newLen)
@@ -58,15 +57,14 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 			buf = tempBuf
 		} else {
 			//remove parsed text from buffer
-			newLen := cap(buf) - n
+			newLen := cap(buf) - bytesParsed
 			if newLen < bufSize {
 				newLen = bufSize
 			}
-			copy(buf, buf[n:])
+			copy(buf, buf[bytesParsed:])
 			buf = buf[:newLen]
-			readToIndex -= n
+			readToIndex -= bytesParsed
 		}
-		bytesParsed += n
 
 	}
 

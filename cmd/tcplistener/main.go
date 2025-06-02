@@ -3,49 +3,8 @@ package main
 import (
 	"fmt"
 	"net"
-	"io"
-	"errors"
-	"strings"
+    "github.com/wexlerdev/httpfromtcp/internal/request" // Import the internal package
 )
-
-func getLinesChannel(f io.ReadCloser) <- chan string {
-	ch := make(chan string)
-
-	go func() {
-		defer close(ch)
-		defer f.Close()
-				
-		currentLine := ""
-		for {
-
-			buffah := make([]byte, 8, 8)
-			nBytesRead, err := f.Read(buffah)
-			if err != nil {
-				if currentLine != "" {
-					ch <- fmt.Sprintf("%s", currentLine)
-					currentLine = ""
-				}
-				if errors.Is(err, io.EOF) {
-					break
-				}
-				return
-			}
-
-			str := string(buffah[:nBytesRead])
-			parts := strings.Split(str, "\r\n")
-			numParts := len(parts)
-
-			for i := 0; i < numParts -1; i++ {
-				ch <- fmt.Sprintf("%s%s", currentLine, parts[i])
-				currentLine = ""
-			}
-
-			currentLine += parts[numParts-1]
-		}
-
-	}()
-	return ch
-}
 
 
 func main() {
@@ -67,11 +26,15 @@ func main() {
 		fmt.Println("Connection has been accepted!")
 
 
-
-		channel := getLinesChannel(conn)
-		for line := range channel {
-			fmt.Printf("%s\n", line)
+		req, err := request.RequestFromReader(conn)
+		if err != nil {
+			fmt.Printf("ERR: %v\n", err)
 		}
+		fmt.Println("Request line:")
+		fmt.Printf("- Method: %v \n", req.RequestLine.Method)
+		fmt.Printf("- Target: %v \n", req.RequestLine.RequestTarget)
+		fmt.Printf("- Version: %v \n", req.RequestLine.HttpVersion)
+
 		fmt.Print("\n")
 		fmt.Println("Connection has been closed")
 	}

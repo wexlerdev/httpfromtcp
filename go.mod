@@ -1,4 +1,4 @@
-module httpfromtcp
+module github.com/wexlerdev/httpfromtcp
 
 go 1.24.3
 
