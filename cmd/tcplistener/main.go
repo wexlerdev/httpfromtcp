@@ -34,9 +34,11 @@ func main() {
 		fmt.Printf("- Method: %v \n", req.RequestLine.Method)
 		fmt.Printf("- Target: %v \n", req.RequestLine.RequestTarget)
 		fmt.Printf("- Version: %v \n", req.RequestLine.HttpVersion)
-
-		fmt.Print("\n")
-		fmt.Println("Connection has been closed")
+		
+		fmt.Println("Headers:")
+		for key, value := range req.Headers {
+			fmt.Printf("- %s: %s\n", key, value)
+		}
 	}
 
 }
