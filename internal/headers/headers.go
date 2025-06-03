@@ -41,7 +41,14 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	}
 
 	fieldName = strings.TrimSpace(fieldName)
-	//fieldName reader for header!
+	
+	fieldName = strings.ToLower(fieldName)
+
+	if !isValidFieldName(fieldName) {
+		return 0, false, errors.New("field name contains invalid chars")
+	}
+
+
 	fieldValue := strings.TrimSpace(colonSlicedStrings[1])
 	
 	h[fieldName] = fieldValue
@@ -50,6 +57,33 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 
 }
 
-
+func isValidFieldName(str string) bool {
+	var allowedSpecialChars = map[rune]bool{
+		'!': true,
+		'#': true,
+		'$': true,
+		'%': true,
+		'&': true,
+		'\'': true, 
+		'*': true,
+		'+': true,
+		'-': true,
+		'.': true,
+		'^': true,
+		'_': true,
+		'`': true,
+		'|': true,
+		'~': true,
+	}
+	if len(str) < 1 {
+		return false
+	}
+	for _, r := range str {
+		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && !allowedSpecialChars[r] {
+			return false
+		}
+	}
+	return true
+}
 
 
