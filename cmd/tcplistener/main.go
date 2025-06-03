@@ -39,6 +39,10 @@ func main() {
 		for key, value := range req.Headers {
 			fmt.Printf("- %s: %s\n", key, value)
 		}
+		fmt.Println("Body:")
+		for _, bite := range req.Body {
+			fmt.Print(string(bite))
+		}
 	}
 
 }

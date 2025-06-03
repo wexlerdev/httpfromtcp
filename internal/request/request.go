@@ -5,11 +5,13 @@ import (
 	"strings"
 	"errors"
 	"fmt"
+	"strconv"
 	"github.com/wexlerdev/httpfromtcp/internal/headers"
 )
 type Request struct {
 	RequestLine RequestLine
 	Headers headers.Headers
+	Body []byte
 	ParserState int
 }
 
@@ -22,6 +24,7 @@ type RequestLine struct {
 const (
 	ParserStateInitialized int = iota // 0
 	ParserStateParsingHeaders
+	ParserStateParsingBody
 	ParserStateDone                   
 )
 
@@ -109,6 +112,19 @@ func (r * Request) parseSingle(data []byte) (int, error) {
 				return 0, err
 			}
 			if done {
+				r.ParserState = ParserStateParsingBody
+			}
+			if n == 0 {
+				return totalBytesParsed, nil
+			}
+
+			totalBytesParsed += n
+		case ParserStateParsingBody:
+			n, done, err := r.parseBody(data)
+			if err != nil {
+				return 0, err
+			}
+			if done {
 				r.ParserState = ParserStateDone
 			}
 			if n == 0 {
@@ -116,10 +132,34 @@ func (r * Request) parseSingle(data []byte) (int, error) {
 			}
 
 			totalBytesParsed += n
+
 		default:
 			return 0, errors.New("can't parse in an unknown state")
 	}
 	return totalBytesParsed, nil
+}
+
+func (r * Request) parseBody(data []byte) (int, bool, error){
+	contentLengthString, err := r.Headers.Get("Content-Length")
+	if err != nil {
+		return 0, true, nil
+	}
+
+	contentLength, err := strconv.Atoi(contentLengthString)
+	if err != nil {
+		return 0, false, fmt.Errorf("contentLength not valid int")
+	}
+
+	r.Body = append(r.Body, data...)
+	if len(r.Body) > contentLength {
+		return 0, false, fmt.Errorf("len of body (%v) > content length (%v)", len(r.Body), contentLength)
+	}
+
+	if len(r.Body) == contentLength {
+		return len(data), true, nil
+	}
+
+	return len(data), false, nil
 }
 
 func parseRequestLine(bites []byte) (*RequestLine, int, error) {

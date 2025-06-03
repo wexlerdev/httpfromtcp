@@ -101,3 +101,12 @@ func (h Headers) Set(key, value string) {
 	
 	h[key] = value
 }
+
+func (h Headers) Get(key string) (string, error){
+	lowerKey := strings.ToLower(key)
+	value, exists := h[lowerKey]
+	if !exists {
+		return "", fmt.Errorf("key %s: not found", lowerKey)
+	}
+	return value, nil
+}
