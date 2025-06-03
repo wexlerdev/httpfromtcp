@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io"
+	"github.com/wexlerdev/httpfromtcp/internal/headers"
 )
 
 type chunkReader struct {
@@ -94,3 +95,72 @@ func TestRequestLineParse(t *testing.T) {
 	_, err = RequestFromReader(reader)
 }
 
+func TestHeadersParse(t *testing.T) {
+	// Test: Valid single header
+	myHeaders := headers.NewHeaders()
+	data := []byte("HoSt: localhost:42069\r\n\r\n")
+	n, done, err := myHeaders.Parse(data)
+	require.NoError(t, err)
+	require.NotNil(t, myHeaders)
+	assert.Equal(t, "localhost:42069", myHeaders["host"])
+	assert.Equal(t, 23, n)
+	assert.False(t, done)
+
+	// Test: Valid single header with extra whitespace
+	myHeaders = headers.NewHeaders()
+	data = []byte("       HOst: localhost:42069                           \r\n\r\n")
+	n, done, err = myHeaders.Parse(data)
+	require.NoError(t, err)
+	require.NotNil(t, myHeaders)
+	assert.Equal(t, "localhost:42069", myHeaders["host"])
+	assert.Equal(t, 57, n)
+	assert.False(t, done)
+
+	// Test: Valid 2 myHeaders with existing myHeaders
+	myHeaders = map[string]string{"host": "localhost:42069"}
+	data = []byte("User-AgenT: curl/7.81.0\r\nAccept: */*\r\n\r\n")
+	n, done, err = myHeaders.Parse(data)
+	require.NoError(t, err)
+	require.NotNil(t, myHeaders)
+	assert.Equal(t, "localhost:42069", myHeaders["host"])
+	assert.Equal(t, "curl/7.81.0", myHeaders["user-agent"])
+	assert.Equal(t, 25, n)
+	assert.False(t, done)
+
+	// Test: Valid done
+	myHeaders = headers.NewHeaders()
+	data = []byte("\r\n a bunCh of other stuff")
+	n, done, err = myHeaders.Parse(data)
+	require.NoError(t, err)
+	require.NotNil(t, myHeaders)
+	assert.Empty(t, myHeaders)
+	assert.Equal(t, 2, n)
+	assert.True(t, done)
+
+	// Test: Invalid spacing header
+	myHeaders = headers.NewHeaders()
+	data = []byte("       HoSt : localhost:42069       \r\n\r\n")
+	n, done, err = myHeaders.Parse(data)
+	require.Error(t, err)
+	assert.Equal(t, 0, n)
+	assert.False(t, done)
+
+	//Test :Invalid chars in field name
+	myHeaders = headers.NewHeaders()
+	data = []byte("Yams🍠🍠🍠: localhost:69420\r\n\r\n")
+	n, done, err = myHeaders.Parse(data)
+	require.Error(t, err)
+	assert.Equal(t,0,n)
+	assert.False(t, done)
+
+	//Test: Valid with multiple values for one field name
+	myHeaders = map[string]string{"host": "sillygooses"}
+	data = []byte("HosT: moregoosesarehere\r\n\r\n")
+	n, done, err = myHeaders.Parse(data)
+	require.NoError(t, err)
+	require.NotNil(t, myHeaders)
+	assert.Equal(t, "sillygooses, moregoosesarehere", myHeaders["host"])
+	//assert.Equal(t, 57, n)
+	assert.False(t, done)
+
+}

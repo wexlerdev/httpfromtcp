@@ -58,10 +58,22 @@ func TestHeadersParse(t *testing.T) {
 	assert.Equal(t, 0, n)
 	assert.False(t, done)
 
+	//Test :Invalid chars in field name
 	headers = NewHeaders()
 	data = []byte("Yams🍠🍠🍠: localhost:69420\r\n\r\n")
 	n, done, err = headers.Parse(data)
 	require.Error(t, err)
 	assert.Equal(t,0,n)
 	assert.False(t, done)
+
+	//Test: Valid with multiple values for one field name
+	headers = map[string]string{"host": "sillygooses"}
+	data = []byte("HosT: moregoosesarehere\r\n\r\n")
+	n, done, err = headers.Parse(data)
+	require.NoError(t, err)
+	require.NotNil(t, headers)
+	assert.Equal(t, "sillygooses, moregoosesarehere", headers["host"])
+	//assert.Equal(t, 57, n)
+	assert.False(t, done)
+
 }

@@ -4,6 +4,7 @@ import (
 	"strings"
 	"errors"
 	"unicode"
+	"fmt"
 )
 
 type Headers map[string]string
@@ -42,7 +43,6 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 
 	fieldName = strings.TrimSpace(fieldName)
 	
-	fieldName = strings.ToLower(fieldName)
 
 	if !isValidFieldName(fieldName) {
 		return 0, false, errors.New("field name contains invalid chars")
@@ -50,8 +50,10 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 
 
 	fieldValue := strings.TrimSpace(colonSlicedStrings[1])
+
+
 	
-	h[fieldName] = fieldValue
+	h.Set(fieldName, fieldValue)
 
 	return len(currentLine), false, nil
 
@@ -87,3 +89,15 @@ func isValidFieldName(str string) bool {
 }
 
 
+func (h Headers) Set(key, value string) {
+
+	key = strings.ToLower(key)
+
+	_, exists := h[key]
+
+	if exists {
+		value = fmt.Sprintf("%s, %s", h[key], value)
+	}
+	
+	h[key] = value
+}
